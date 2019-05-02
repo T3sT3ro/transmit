@@ -29,7 +29,7 @@ void criterr(const char *str) // error handling function
 {
     fprintf(
         stderr,
-        "error: %s\n", str == NULL ? strerror(errno) : str);
+        "error: %s errno: %s\n", str, strerror(errno));
     exit(EXIT_FAILURE);
 }
 

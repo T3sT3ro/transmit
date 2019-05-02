@@ -15,26 +15,26 @@ struct sockaddr_in      server_addr;                    // server address struct
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
     if (!fopen(argv[3], "wb")) // override binary mode file
-        criterr("Cannot open output file.\n");
-    if ((fsize = strtoul(argv[4], NULL, 0)) || errno) // fliesize
-        criterr("Invalid filesize.\n");
+        criterr("cannot open output file");
+    if ((fsize = strtoul(argv[4], NULL, 0)) <= 0 || errno) // fliesize
+        criterr("invalid filesize");
     // ceil of fsize/MAX_DATAGRAM_SIZE
     window_size = min(MAX_WINDOW_SIZE, (fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE);
 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
     if (sockfd < 0)
-        criterr(NULL);
+        criterr("socket creation failed");
 
     // setup server_address
     bzero(&server_address, sizeof(server_address));
     server_address.sin_family   = AF_INET;
     server_address.sin_port     = strtoul(argv[2], NULL, 10); // port
     if (errno) // check if port is 
-        criterr(NULL); // ERANGE from strtoul;
+        criterr("port conversion failed"); // ERANGE from strtoul;
 
     // check IP format
     if (!inet_pton(AF_INET, argv[1], &server_address.sin_addr.s_addr)) // IP
-        criterr("Invalid IP address.\n");
+        criterr("invalid IP address");
 
     // convert host long-> network long
     server_address.sin_port         = htons(server_address.sin_port);
@@ -42,7 +42,7 @@ void setup_environment(struct sockaddr_in &server_address, char **argv) {
 
 
     if (bind(sockfd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-        criterr(NULL);
+        criterr("bind error");
 }
 
 // requests part of file from server starting at offset with given size
@@ -54,13 +54,13 @@ void request_part(unsigned int offset, size_t size,
     if (sendto(sockfd, msg, msg_len, 0, 
                (struct sockaddr *)&sender, sender_len)
         != (int) msg_len) 
-        criterr(NULL);
+        criterr("Sendto error");
 }
 
 int main(const int argc, char *argv[]) {
     // arguments: IP, port, filename, filesize
     if (argc != 5)
-        criterr("Invalid arguments. Required: IP port filename filesize.\n");
+        criterr("Invalid arguments.\n Required format: IP port filename filesize.\n");
 
     setup_environment(server_addr, argv);
 
@@ -83,12 +83,12 @@ int main(const int argc, char *argv[]) {
         // select with timeout of 0.01 sec for replies
         fd_set fds;     FD_ZERO(&fds);      FD_SET(sockfd, &fds);
         int ready = select(sockfd + 1, &fds, NULL, NULL, &tv);
-        if (ready < 0)          criterr(NULL);  // error
+        if (ready < 0)          criterr("selet ready<0");  // error
         else if (ready == 0)    continue;       // nothing came - request again
 
         ssize_t                 datagram_len = recvfrom(sockfd, buffer, IP_MAXPACKET, 0,
                                                         (struct sockaddr *)&sender, &sender_len);
-        if (datagram_len < 0)   criterr(NULL);
+        if (datagram_len < 0)   criterr("datagram length error");
 
         int     r_offset; // received data offset
         int     r_size;   // received data size
@@ -107,8 +107,9 @@ int main(const int argc, char *argv[]) {
         // move window and copy data to file
         while(window_received[window_it % MAX_WINDOW_SIZE]){
             window_received[window_it % MAX_WINDOW_SIZE] = false;
-            write(fileno(outfd), window[window_it % MAX_WINDOW_SIZE], // append data to the file
-                  min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it));
+            size_t data_len = min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it);
+            if(write(fileno(outfd), window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
+                criterr("data write error");
             ++window_it;
             if((window_it+window_size)*MAX_DATAGRAM_SIZE >= fsize)
                 --window_size;
