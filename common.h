@@ -23,7 +23,7 @@ using namespace std;
 #include <stdlib.h>
 #include <string>
 #include <sys/types.h>
-//#include <unistd.h> // getpid
+#include <unistd.h> // getpid
 
 void criterr(const char *str) // error handling function
 {

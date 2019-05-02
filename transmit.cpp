@@ -47,12 +47,12 @@ void setup_environment(struct sockaddr_in &server_address, char **argv) {
 
 // requests part of file from server starting at offset with given size
 void request_part(unsigned int offset, size_t size,
-                  struct sockaddr_in * sender, socklen_t sender_len) {
+                  struct sockaddr_in &sender, socklen_t sender_len) {
     char msg[32];
     sprintf(msg, "GET %u %zu\n", offset, size);
     size_t msg_len = strlen(msg);
     if (sendto(sockfd, msg, msg_len, 0, 
-               (struct sockaddr *)&sender, &sender_len)
+               (struct sockaddr *)&sender, sender_len)
         != msg_len) 
         criterr(NULL);
 }
@@ -90,24 +90,24 @@ int main(const int argc, char *argv[]) {
                                                         (struct sockaddr *)&sender, &sender_len);
         if (datagram_len < 0)   criterr(NULL);
 
-        int     r_offset; // received data offset
-        int     r_size;   // received data size
+        size_t     r_offset; // received data offset
+        size_t     r_size;   // received data size
 
         if (sender.sin_port == server_addr.sin_port &&              // check server IP and PORT
             server_addr.sin_addr.s_addr == sender.sin_addr.s_addr &&
-            sscanf("DATA %zu %zu\n", &r_offset, &r_size) == 2 &&    // check `DATA ...` header
+            sscanf((char*) buffer, "DATA %zu %zu\n", &r_offset, &r_size) == 2 &&    // check `DATA ...` header
             r_offset/MAX_DATAGRAM_SIZE >= window_it &&              // from current window
             r_offset/MAX_DATAGRAM_SIZE < window_it + window_size &&
             !window_received[r_offset/MAX_DATAGRAM_SIZE])           // datagram not received
         {   // copy and mark datagram as read
             window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE] = true;
-            memcpy(window[r_offset % MAX_WINDOW_SIZE], strchr(buffer, '\n') + 1, r_size); 
+            memcpy(window[r_offset % MAX_WINDOW_SIZE], strchr((char *)buffer, '\n') + 1, r_size); 
         }
 
         // move window and copy data to file
         while(window_received[window_it % MAX_WINDOW_SIZE]){
             window_received[window_it % MAX_WINDOW_SIZE] = false;
-            write(outfd, window[window_it % MAX_WINDOW_SIZE], // append data to the file
+            write(fileno(outfd), window[window_it % MAX_WINDOW_SIZE], // append data to the file
                   min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it));
             ++window_it;
             if((window_it+window_size)*MAX_DATAGRAM_SIZE >= fsize)
@@ -118,6 +118,6 @@ int main(const int argc, char *argv[]) {
     }
 
     close(sockfd); // close the socket
-    close(outfd);  // close the output file
+    flcose(outfd); // close the output file
     return EXIT_SUCCESS;
 }
