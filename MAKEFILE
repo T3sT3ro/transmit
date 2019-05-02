@@ -1,0 +1,24 @@
+# maksymilian_polarczyk
+# 300791
+OBJS	= transmit.o icmp_checksum.o icmp_transmit.o
+SOURCE	= transmit.cpp icmp_checksum.cpp icmp_transmit.cpp
+HEADER	= icmp_checksum.h icmp_transmit.h common.h
+OUT	= transmit
+CC	 = g++
+FLAGS	 = -g -c -Wall -Wextra
+LFLAGS	 = 
+
+all: $(OBJS)
+	$(CC) -g $(OBJS) -o $(OUT) $(LFLAGS)
+
+transmit.o: transmit.cpp
+	$(CC) $(FLAGS) transmit.cpp -std=c++11
+
+icmp_checksum.o: icmp_checksum.cpp
+	$(CC) $(FLAGS) icmp_checksum.cpp -std=c++11
+
+icmp_transmit.o: icmp_transmit.cpp
+	$(CC) $(FLAGS) icmp_transmit.cpp -std=c++11
+
+clean:
+	rm -f $(OBJS) $(OUT)
