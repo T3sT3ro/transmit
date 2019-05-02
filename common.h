@@ -11,7 +11,7 @@ using namespace std;
 #define MAX_FILESIZE 10001000         // maximum filesize to send
 
 #include <arpa/inet.h>
-#include <Winsock2.h>
+//#include <Winsock2.h>
 
 #include <chrono>
 #include <ctime>
@@ -25,11 +25,11 @@ using namespace std;
 #include <sys/types.h>
 //#include <unistd.h> // getpid
 
-void criterr(const char str *) // error handling function
+void criterr(const char *str) // error handling function
 {
     fprintf(
         stderr,
-        str == NULL ? "error: %s\n", strerror(errno) : str);
+        "error: %s\n", str == NULL ? strerror(errno) : str);
     exit(EXIT_FAILURE);
 }
 

@@ -9,13 +9,14 @@ int         window_size = MAX_WINDOW_SIZE;              // size of current windo
 int         sockfd;                                     // socket file descriptor
 FILE *      outfd = NULL;                               // output file descriptor
 int         fsize;                                      // filesize from argument
+struct sockaddr_in      server_addr;                    // server address struct
 
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
     if (!fopen(argv[3], "wb")) // override binary mode file
         criterr("Cannot open output file.\n");
-    if ((fsize = stroul(argv[4])) || errno) // fliesize
+    if ((fsize = strtoul(argv[4], NULL, 0)) || errno) // fliesize
         criterr("Invalid filesize.\n");
     // ceil of fsize/MAX_DATAGRAM_SIZE
     window_size = min(MAX_WINDOW_SIZE, (fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE);
@@ -29,30 +30,31 @@ void setup_environment(struct sockaddr_in &server_address, char **argv) {
     server_address.sin_family   = AF_INET;
     server_address.sin_port     = strtoul(argv[2], NULL, 10); // port
     if (errno) // check if port is 
-        criterr(); // ERANGE from strtoul;
+        criterr(NULL); // ERANGE from strtoul;
 
     // check IP format
     if (!inet_pton(AF_INET, argv[1], &server_address.sin_addr.s_addr)) // IP
         criterr("Invalid IP address.\n");
 
     // convert host long-> network long
-    server_address.sing_port        = htons(server_address.sing_port);
-    server_address.sin_addr.s_addr  = htonl(server_address.sin_addr.s_addr));
+    server_address.sin_port         = htons(server_address.sin_port);
+    server_address.sin_addr.s_addr  = htonl(server_address.sin_addr.s_addr);
 
 
     if (bind(sockfd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-        criterr();
+        criterr(NULL);
 }
 
 // requests part of file from server starting at offset with given size
-void request_part(unsigned int offset, size_t size) {
+void request_part(unsigned int offset, size_t size,
+                  struct sockaddr_in * sender, socklen_t sender_len) {
     char msg[32];
-    sprintf(msg, "GET %u %u\n", offset, size);
+    sprintf(msg, "GET %u %zu\n", offset, size);
     size_t msg_len = strlen(msg);
-    if (sendto(sockfd, msg, msg_len 0, 
+    if (sendto(sockfd, msg, msg_len, 0, 
                (struct sockaddr *)&sender, &sender_len)
         != msg_len) 
-        criterr();
+        criterr(NULL);
 }
 
 int main(const int argc, char *argv[]) {
@@ -60,18 +62,22 @@ int main(const int argc, char *argv[]) {
     if (argc != 5)
         criterr("Invalid arguments. Required: IP port filename filesize.\n");
 
-    struct sockaddr_in server_addr;
     setup_environment(server_addr, argv);
 
     struct timeval tv {0, DATAGRAM_TIMEOUT_MICROS};   // timeout to wait for reply
 
     while (window_size > 0){    // while still exists
+        struct sockaddr_in      sender;
+        socklen_t               sender_len = sizeof(sender);
+        u_int8_t                buffer[IP_MAXPACKET + 1]; // packet
+
         //request packets
         for (int i = window_it; i < window_size; i++) // request missing packets
             if (!window_received[window_it % MAX_WINDOW_SIZE])
                 request_part(
                     window_it * MAX_DATAGRAM_SIZE,
-                    min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it)
+                    min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it),
+                    sender, sender_len
                 );
 
         // select with timeout of 0.01 sec for replies
@@ -80,9 +86,6 @@ int main(const int argc, char *argv[]) {
         if (ready < 0)          criterr(NULL);  // error
         else if (ready == 0)    continue;       // nothing came - request again
 
-        struct sockaddr_in      sender;
-        socklen_t               sender_len = sizeof(sender);
-        u_int8_t                buffer[IP_MAXPACKET + 1]; // packet
         ssize_t                 datagram_len = recvfrom(sockfd, buffer, IP_MAXPACKET, 0,
                                                         (struct sockaddr *)&sender, &sender_len);
         if (datagram_len < 0)   criterr(NULL);
