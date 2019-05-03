@@ -60,10 +60,10 @@ int main(const int argc, char *argv[]) {
 
         //request packets
         for (int i = window_it; i < window_size; i++) // request missing packets
-            if (!window_received[window_it % MAX_WINDOW_SIZE])
+            if (!window_received[i % MAX_WINDOW_SIZE])
                 request_part(
-                    window_it * MAX_DATAGRAM_SIZE,
-                    min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it)
+                    i * MAX_DATAGRAM_SIZE,
+                    min(MAX_DATAGRAM_SIZE, fsize - i * MAX_DATAGRAM_SIZE)
                 );
 
         // select with timeout for replies
@@ -91,7 +91,7 @@ int main(const int argc, char *argv[]) {
         }
 
         // move window and copy data to file
-        while(window_received[window_it % MAX_WINDOW_SIZE]){
+        while(window_size > 0 && window_received[window_it % MAX_WINDOW_SIZE]){
             window_received[window_it % MAX_WINDOW_SIZE] = false;
             int data_len = min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it);
             if(write(outfd, window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
