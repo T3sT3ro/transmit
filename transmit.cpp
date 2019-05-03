@@ -13,7 +13,7 @@ struct sockaddr_in      server_addr;                    // server address struct
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
-    if ((outfd = open(argv[3], O_WRONLY | O_CREAT)) < 0) // override binary mode file
+    if ((outfd = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC)) < 0) // override binary mode file
         criterr("cannot open output file");
     if ((fsize = strtoul(argv[4], NULL, 0)) <= 0 || errno) // fliesize
         criterr("invalid filesize");
@@ -59,11 +59,11 @@ int main(const int argc, char *argv[]) {
         u_int8_t                buffer[IP_MAXPACKET + 1];       // datagram
 
         //request packets
-        for (int i = window_it; i < window_size; i++) // request missing packets
-            if (!window_received[i % MAX_WINDOW_SIZE])
+        for (int i = 0; i < window_size; i++) // request missing packets
+            if (!window_received[(window_it+i) % MAX_WINDOW_SIZE])
                 request_part(
-                    i * MAX_DATAGRAM_SIZE,
-                    min(MAX_DATAGRAM_SIZE, fsize - i * MAX_DATAGRAM_SIZE)
+                    (window_it+i) * MAX_DATAGRAM_SIZE,
+                    min(MAX_DATAGRAM_SIZE, fsize - (window_it + i) * MAX_DATAGRAM_SIZE)
                 );
 
         // select with timeout for replies
@@ -84,7 +84,7 @@ int main(const int argc, char *argv[]) {
             sscanf((char*) buffer, "DATA %u %u\n", &r_offset, &r_size) == 2 &&    // check `DATA ...` header
             r_offset/MAX_DATAGRAM_SIZE >= window_it &&              // from current window
             r_offset/MAX_DATAGRAM_SIZE < window_it + window_size &&
-            !window_received[r_offset/MAX_DATAGRAM_SIZE])           // datagram not received
+            !window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE])           // datagram not received
         {   // copy and mark datagram as read
             window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE] = true;
             memcpy(window[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE], 
@@ -102,6 +102,7 @@ int main(const int argc, char *argv[]) {
                 --window_size;
             printf("%.3f%% downloaded\n", 
             window_it*100.0 / (float)((fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE));
+            fflush(stdout);
         }
 
     }
