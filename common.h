@@ -7,7 +7,7 @@ using namespace std;
 
 #define MAX_WINDOW_SIZE 1000               // number of datagrams per window
 #define MAX_DATAGRAM_SIZE 1000        // maximum single data in datagram
-#define DATAGRAM_TIMEOUT_MICROS 10000 // 0.01 second timeout to resend GET request
+#define DATAGRAM_TIMEOUT_MICROS 1000 // 0.001 second timeout to resend GET request
 #define MAX_FILESIZE 10001000         // maximum filesize to send
 
 #include <arpa/inet.h>
@@ -23,7 +23,9 @@ using namespace std;
 #include <stdlib.h>
 #include <string>
 #include <sys/types.h>
-#include <unistd.h> // getpid
+#include <unistd.h>
+#include <fcntl.h> // O_FLAGS
+
 
 void criterr(const char *str) // error handling function
 {

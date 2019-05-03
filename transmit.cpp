@@ -7,13 +7,13 @@ bool        window_received[MAX_WINDOW_SIZE];           // bool table of receive
 int         window_it = 0;                              // window as circular buffer
 int         window_size = MAX_WINDOW_SIZE;              // size of current window
 int         sockfd;                                     // socket file descriptor
-FILE *      outfd = NULL;                               // output file descriptor
+int         outfd;                                      // output file descriptor
 int         fsize;                                      // filesize from argument
 struct sockaddr_in      server_addr;                    // server address struct
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
-    if (!fopen(argv[3], "wb")) // override binary mode file
+    if ((outfd = open(argv[3], O_WRONLY | O_CREAT)) < 0) // override binary mode file
         criterr("cannot open output file");
     if ((fsize = strtoul(argv[4], NULL, 0)) <= 0 || errno) // fliesize
         criterr("invalid filesize");
@@ -66,7 +66,7 @@ int main(const int argc, char *argv[]) {
                     min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it)
                 );
 
-        // select with timeout of 0.01 sec for replies
+        // select with timeout for replies
         fd_set fds;     FD_ZERO(&fds);      FD_SET(sockfd, &fds);
         int ready = select(sockfd + 1, &fds, NULL, NULL, &tv);
         if (ready < 0)          criterr("selet ready<0");  // error
@@ -94,17 +94,18 @@ int main(const int argc, char *argv[]) {
         while(window_received[window_it % MAX_WINDOW_SIZE]){
             window_received[window_it % MAX_WINDOW_SIZE] = false;
             int data_len = min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it);
-            if(write(fileno(outfd), window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
+            if(write(outfd, window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
                 criterr("data write error");
             ++window_it;
             if((window_it+window_size)*MAX_DATAGRAM_SIZE >= fsize)
                 --window_size;
-            printf("%.3f%% downloaded\n", (float)window_it / (float)fsize);
+            printf("%.3f%% downloaded\n", 
+            window_it*100.0 / (float)((fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE));
         }
 
     }
 
     close(sockfd); // close the socket
-    fclose(outfd); // close the output file
+    close(outfd); // close the output file
     return EXIT_SUCCESS;
 }
