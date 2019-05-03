@@ -34,13 +34,12 @@ void setup_environment(struct sockaddr_in &server_address, char **argv) {
 }
 
 // requests part of file from server starting at offset with given size
-void request_part(unsigned int offset, size_t size,
-                  struct sockaddr_in &sender, socklen_t sender_len) {
+void request_part(unsigned int offset, size_t size) {
     char msg[32];
     sprintf(msg, "GET %u %zu\n", offset, size);
     size_t msg_len = strlen(msg);
     if (sendto(sockfd, msg, msg_len, 0, 
-               (struct sockaddr *)&sender, sender_len)
+               (struct sockaddr *)&server_addr, sizeof(server_addr))
         != (int) msg_len) 
         criterr("Sendto error");
 }
@@ -50,7 +49,6 @@ int main(const int argc, char *argv[]) {
     if (argc != 5)
         criterr("Invalid arguments.\n Required format: IP port filename filesize.\n");
 
-    fprintf(stderr, "args: %s %s %s %s %s", argv[0], argv[1], argv[2], argv[3], argv[4]);
     setup_environment(server_addr, argv);
 
     struct timeval tv {0, DATAGRAM_TIMEOUT_MICROS};   // timeout to wait for reply
@@ -65,8 +63,7 @@ int main(const int argc, char *argv[]) {
             if (!window_received[window_it % MAX_WINDOW_SIZE])
                 request_part(
                     window_it * MAX_DATAGRAM_SIZE,
-                    min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it),
-                    sender, sender_len
+                    min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it)
                 );
 
         // select with timeout of 0.01 sec for replies
