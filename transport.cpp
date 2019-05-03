@@ -13,7 +13,7 @@ struct sockaddr_in      server_addr;                    // server address struct
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
-    if ((outfd = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC)) < 0) // override binary mode file
+    if ((outfd = open(argv[3], O_RDWR | O_CREAT | O_TRUNC)) < 0) // override binary mode file
         criterr("cannot open output file");
     if ((fsize = strtoul(argv[4], NULL, 0)) <= 0 || errno) // fliesize
         criterr("invalid filesize");
@@ -92,7 +92,7 @@ int main(const int argc, char *argv[]) {
         }
 
         // move window and copy data to file
-        while(window_size > 0 && window_received[window_it % MAX_WINDOW_SIZE]){
+        while(window_received[window_it % MAX_WINDOW_SIZE]){
             window_received[window_it % MAX_WINDOW_SIZE] = false;
             int data_len = min(MAX_DATAGRAM_SIZE, fsize - MAX_DATAGRAM_SIZE * window_it);
             if(write(outfd, window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
@@ -100,9 +100,8 @@ int main(const int argc, char *argv[]) {
             ++window_it;
             if((window_it+window_size)*MAX_DATAGRAM_SIZE >= fsize)
                 --window_size;
-            printf("%.3f%% downloaded\n", 
+            fprintf(stderr, "%.3f%% done\n", 
             window_it*100.0 / (float)((fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE));
-            fflush(stdout);
         }
 
     }
