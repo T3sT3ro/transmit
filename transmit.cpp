@@ -10,7 +10,6 @@ int         sockfd;                                     // socket file descripto
 FILE *      outfd = NULL;                               // output file descriptor
 int         fsize;                                      // filesize from argument
 struct sockaddr_in      server_addr;                    // server address struct
-struct in_addr          server_ipaddr;                  // ip address requested
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
@@ -29,11 +28,8 @@ void setup_environment(struct sockaddr_in &server_address, char **argv) {
     bzero(&server_address, sizeof(server_address));
     server_address.sin_family       = AF_INET;
     server_address.sin_port         = htons(strtoul(argv[2], NULL, 10)); // port
-    server_address.sin_addr.s_addr  = htonl(INADDR_ANY);
     if (errno) criterr("port conversion failed"); // ERANGE from strtoul;
-
-    // check IP format
-    if (!inet_pton(AF_INET, argv[1], &ipaddr)) // IP
+    if (!inet_pton(AF_INET, argv[1], &server_address.sin_addr) // IP
         criterr("invalid IP address");
 
     // convert host long-> network long
@@ -94,7 +90,7 @@ int main(const int argc, char *argv[]) {
         int     r_size;   // received data size
 
         if (sender.sin_port == server_addr.sin_port &&              // check server IP and PORT
-            sender.sin_addr.s_addr == server_ipaddr &&
+            server_addr.sin_addr.s_addr == sender.sin_addr.s_addr &&
             sscanf((char*) buffer, "DATA %u %u\n", &r_offset, &r_size) == 2 &&    // check `DATA ...` header
             r_offset/MAX_DATAGRAM_SIZE >= window_it &&              // from current window
             r_offset/MAX_DATAGRAM_SIZE < window_it + window_size &&

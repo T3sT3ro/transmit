@@ -20,6 +20,7 @@ using namespace std;
 #include <netinet/udp.h>
 #include <netinet/ip.h>
 #include <stdlib.h>
+#include <string>
 #include <sys/types.h>
 #include <unistd.h> // getpid
 
