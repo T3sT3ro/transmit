@@ -87,7 +87,8 @@ int main(const int argc, char *argv[]) {
             !window_received[r_offset/MAX_DATAGRAM_SIZE])           // datagram not received
         {   // copy and mark datagram as read
             window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE] = true;
-            memcpy(window[r_offset % MAX_WINDOW_SIZE], strchr((char *)buffer, '\n') + 1, r_size); 
+            memcpy(window[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE], 
+                   strchr((char *)buffer, '\n') + 1, r_size); 
         }
 
         // move window and copy data to file
