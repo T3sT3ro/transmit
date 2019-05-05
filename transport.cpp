@@ -7,18 +7,21 @@ bool        window_received[MAX_WINDOW_SIZE];           // bool table of receive
 int         window_it = 0;                              // window as circular buffer
 int         window_size = MAX_WINDOW_SIZE;              // size of current window
 int         sockfd;                                     // socket file descriptor
+int         numblocks;                                  // number of full blocks rounded up
 int         outfd;                                      // output file descriptor
 int         fsize;                                      // filesize from argument
 struct sockaddr_in      server_addr;                    // server address struct
+
 // suts up the output file and connection
 void setup_environment(struct sockaddr_in &server_address, char **argv) {
     // open output file
-    if ((outfd = open(argv[3], O_RDWR | O_CREAT | O_TRUNC)) < 0) // override binary mode file
+    if ((outfd = open(argv[3], O_RDWR | O_CREAT | O_TRUNC, 0644)) < 0) // -rw-r--r--
         criterr("cannot open output file");
     if ((fsize = strtoul(argv[4], NULL, 0)) <= 0 || errno) // fliesize
         criterr("invalid filesize");
     // ceil of fsize/MAX_DATAGRAM_SIZE
-    window_size = min(MAX_WINDOW_SIZE, (fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE);
+    numblocks = (fsize + MAX_DATAGRAM_SIZE - 1) / MAX_DATAGRAM_SIZE;
+    window_size = min(MAX_WINDOW_SIZE, numblocks);
 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
     if (sockfd < 0)
@@ -98,10 +101,11 @@ int main(const int argc, char *argv[]) {
             if(write(outfd, window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
                 criterr("data write error");
             ++window_it;
-            if((window_it+window_size)*MAX_DATAGRAM_SIZE >= fsize)
+            if((window_it+window_size) > blocks)
                 --window_size;
             fprintf(stderr, "%.3f%% done\n", 
             window_it*100.0 / (float)((fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE));
+            fflush(stderr);
         }
 
     }
