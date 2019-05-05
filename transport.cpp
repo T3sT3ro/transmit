@@ -101,7 +101,7 @@ int main(const int argc, char *argv[]) {
             if(write(outfd, window[window_it % MAX_WINDOW_SIZE], data_len) != data_len)
                 criterr("data write error");
             ++window_it;
-            if((window_it+window_size) > blocks)
+            if((window_it+window_size) > numblocks)
                 --window_size;
             fprintf(stderr, "%.3f%% done\n", 
             window_it*100.0 / (float)((fsize-1+MAX_DATAGRAM_SIZE)/MAX_DATAGRAM_SIZE));
