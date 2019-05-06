@@ -3,7 +3,8 @@
 #include "common.h"
 
 u_int8_t    window[MAX_WINDOW_SIZE][MAX_DATAGRAM_SIZE]; // window buffer
-bool        window_received[MAX_WINDOW_SIZE];           // bool table of received datagrams
+bool        window_received[MAX_WINDOW_SIZE];           // timeouts of received datagrams
+chronoret   window_timestamps[MAX_DATAGRAM_SIZE];       // timestamps of requests sent
 int         window_it = 0;                              // window as circular buffer
 int         window_size = MAX_WINDOW_SIZE;              // size of current window
 int         sockfd;                                     // socket file descriptor
@@ -55,6 +56,13 @@ int main(const int argc, char *argv[]) {
     setup_environment(server_addr, argv);
 
     struct timeval tv {0, DATAGRAM_TIMEOUT_MICROS};   // timeout to wait for reply
+    for (int i = 0; i < window_size; i++){ // initialize timestamps and send requests
+        window_timestamps[i] = chrono::high_resolution_clock::now();
+        request_part(
+                    i * MAX_DATAGRAM_SIZE,
+                    min(MAX_DATAGRAM_SIZE, fsize - i * MAX_DATAGRAM_SIZE)
+                );
+    }
 
     while (window_size > 0){    // while still exists
         struct sockaddr_in      sender;
@@ -63,11 +71,19 @@ int main(const int argc, char *argv[]) {
 
         //request packets
         for (int i = 0; i < window_size; i++) // request missing packets
-            if (!window_received[(window_it+i) % MAX_WINDOW_SIZE])
-                request_part(
-                    (window_it+i) * MAX_DATAGRAM_SIZE,
-                    min(MAX_DATAGRAM_SIZE, fsize - (window_it + i) * MAX_DATAGRAM_SIZE)
-                );
+            if (!window_received[(window_it+i) % MAX_WINDOW_SIZE] &&
+                chrono::duration_cast<chrono::milliseconds>(
+                    chrono::high_resolution_clock::now()
+                    - window_timestamps[(window_it+i) % MAX_WINDOW_SIZE]).count()
+                    > 500){ // if no reply came in 0.5 sec, resend
+    
+                    request_part( // resend request
+                        (window_it+i) * MAX_DATAGRAM_SIZE,
+                        min(MAX_DATAGRAM_SIZE, fsize - (window_it + i) * MAX_DATAGRAM_SIZE)
+                    );
+                    window_timestamps[(window_it+i) % MAX_WINDOW_SIZE] = 
+                        chrono::high_resolution_clock::now(); // update timestamp
+                    }
 
         // select with timeout for replies
         fd_set fds;     FD_ZERO(&fds);      FD_SET(sockfd, &fds);
@@ -90,8 +106,10 @@ int main(const int argc, char *argv[]) {
             !window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE])           // datagram not received
         {   // copy and mark datagram as read
             window_received[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE] = true;
+            window_timestamps[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE] -=
+                std::chrono::seconds(1); // so that next packet requets will be sent
             memcpy(window[(r_offset/MAX_DATAGRAM_SIZE) % MAX_WINDOW_SIZE], 
-                   strchr((char *)buffer, '\n') + 1, r_size); 
+                   strchr((char *)buffer, '\n') + 1, r_size);
         }
 
         // move window and copy data to file
